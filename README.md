@@ -46,7 +46,7 @@ Usage of shareitgo:
 
 ## Manually Build
 
-We using `go-bindata` to embed files to golang file
+We using `go-bindata` to embed html template files to golang file
 
 ```
 go-bindata assets/
