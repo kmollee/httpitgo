@@ -7,7 +7,7 @@ Sometime we need to share something on HTTP briefly, so I write a simple program
 ## Installation
 
 ```
-go install github.com/kmollee/shareitgo
+go get github.com/kmollee/shareitgo
 ```
 
 ## Usage
