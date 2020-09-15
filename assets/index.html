@@ -1,0 +1,18 @@
+<html>
+
+<head>
+        <title></title>
+</head>
+
+<body>
+
+        <form action="/auth" method="post">
+                Password:<input type="password" name="password">
+                <input type="submit" value="Enter">
+                {{ if .errMsg }}
+                <br /><span style="color:red">{{.errMsg}}</span>
+                {{ end }}
+        </form>
+</body>
+
+</html>

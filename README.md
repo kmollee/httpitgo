@@ -15,16 +15,18 @@ go get github.com/kmollee/shareitgo
 ```
 Usage of shareitgo:
   -d string
-      the directory of static file to host (default ".")
+        the directory of static file to host (default ".")
   -ip string
-      host addr
+        host addr
   -p int
-      port to listen (default 3000)
+        port to listen (default 3000)
+  -password string
+        password
 ```
 
 ## Example
 
-1. share current on address `:3000`
+1. share current directory on address `:3000`
 
    ```
    shareitgo
@@ -35,3 +37,18 @@ Usage of shareitgo:
    ```
    shareitgo -ip 192.168.82.28 -p 10080 -d ~/Videos
    ```
+
+3. share video directory with password
+
+   ```
+   shareitgo -password 123 -d ~/Videos
+   ```
+
+## Manually Build
+
+We using `go-bindata` to embed files to golang file
+
+```
+go-bindata assets/
+go build
+```

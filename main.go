@@ -3,6 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"html/template"
+	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"regexp"
@@ -53,10 +56,81 @@ func noCache(h http.Handler) http.Handler {
 	return http.HandlerFunc(fn)
 }
 
+const charset = "abcdefghijklmnopqrstuvwxyz" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+var seededRand *rand.Rand = rand.New(
+	rand.NewSource(time.Now().UnixNano()))
+
+func StringWithCharset(length int, charset string) string {
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
+func randomString(length int) string {
+	return StringWithCharset(length, charset)
+}
+
+type context struct {
+	password string
+	key      string
+	magic    string
+	tmpl     *template.Template
+}
+
+func newContext(password string, key string, loginTemplate []byte) *context {
+
+	return &context{
+		password: password,
+		key:      key,
+		magic:    randomString(15),
+		tmpl:     template.Must(template.New("").Parse(string(loginTemplate))),
+	}
+}
+
+func (c *context) authentication(h http.Handler, redirectUrl string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, err := r.Cookie(c.key); err != nil {
+			http.Redirect(w, r, redirectUrl, http.StatusSeeOther)
+			return
+		}
+
+		cookie, err := r.Cookie("stamp")
+		if err != nil || cookie.Value != c.magic {
+			http.Redirect(w, r, redirectUrl, http.StatusSeeOther)
+			return
+		}
+
+		h.ServeHTTP(w, r)
+	})
+}
+
+func (c *context) auth(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		c.tmpl.Execute(w, nil)
+		return
+	} else {
+		if r.FormValue("password") == c.password {
+			expiration := time.Now()
+			expiration = expiration.Add(time.Minute * 15)
+			http.SetCookie(w, &http.Cookie{Name: c.key, Value: "true", Expires: expiration})
+			http.SetCookie(w, &http.Cookie{Name: "stamp", Value: c.magic, Expires: expiration})
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+		} else {
+			c.tmpl.Execute(w, map[string]string{"errMsg": "wrong password"})
+			return
+		}
+
+	}
+}
+
 func main() {
 	ip := flag.String("ip", "", "host addr")
 	port := flag.Int("p", 3000, "port to listen")
 	d := flag.String("d", ".", "the directory of static file to host")
+	password := flag.String("password", "", "password")
 	flag.Parse()
 
 	// check host ip valid
@@ -75,7 +149,19 @@ func main() {
 		fmt.Fprintf(os.Stderr, "could not serve the directory(%s): %v\n", directory, err)
 		os.Exit(1)
 	}
-	http.Handle("/", noCache(http.FileServer(http.Dir(directory))))
+
+	if *password != "" {
+		data, err := Asset("assets/index.html")
+		if err != nil {
+			log.Panicf("could not found template: %v", err)
+		}
+		context := newContext(*password, "auth", data)
+		http.HandleFunc("/auth", context.auth)
+		http.Handle("/", context.authentication(noCache(http.FileServer(http.Dir(directory))), "/auth"))
+	} else {
+
+		http.Handle("/", noCache(http.FileServer(http.Dir(directory))))
+	}
 
 	// start serve
 	address := fmt.Sprintf("%s:%d", hostIP, *port)
